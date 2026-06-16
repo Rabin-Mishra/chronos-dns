@@ -8,8 +8,6 @@ import os
 import json
 import shutil
 import httpx
-import socket
-import ssl
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import dns.message

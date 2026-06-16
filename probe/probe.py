@@ -13,13 +13,12 @@ import ssl
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, Dict, List, AsyncGenerator, Optional
-from urllib.parse import urlparse
 
 import httpx
 import dns.message
 import dns.query
 import dns.rdatatype
-from fastapi import FastAPI, BackgroundTasks, Depends, Response
+from fastapi import FastAPI, Depends, Response
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from sqlalchemy.orm import Session
 
