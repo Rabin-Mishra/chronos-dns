@@ -101,6 +101,10 @@ jobs:
         IMAGE: ${{ steps.meta.outputs.image_name }}
         SHA: ${{ github.sha }}
       run: |
+        scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
+          probe/docker-compose.yml \
+          ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/chronos/docker-compose.yml
+
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
           ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
           "echo ${{ secrets.GITHUB_TOKEN }} | \

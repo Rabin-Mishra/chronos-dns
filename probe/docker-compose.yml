@@ -1,6 +1,7 @@
 version: "3.8"
 services:
   probe:
+    image: ghcr.io/rabin-mishra/chronos-dns-probe:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
