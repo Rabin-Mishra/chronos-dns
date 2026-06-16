@@ -39,7 +39,8 @@ jobs:
       run: ruff check .
 
     - name: Run Tests (pytest)
-      run: pytest probe/tests/ -v --tb=short
+      working-directory: ./probe
+      run: PYTHONPATH=. pytest tests/ -v --tb=short
 
   build-and-push:
     name: Build & Push Docker Image
