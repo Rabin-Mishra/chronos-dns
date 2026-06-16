@@ -119,13 +119,13 @@ resource "aws_security_group" "probe_sg" {
   description = "Security group for Chronos-DNS probe EC2 instance"
   vpc_id      = aws_vpc.main.id
 
-  # Inbound SSH restricted to user's IP
+  # Inbound SSH from anywhere (needed for GitHub Actions CI/CD deployment)
   ingress {
     description = "Restricted SSH access"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = [local.my_ip_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # Outbound rules - Allow all egress to perform measurements and connect to Cloudflare
