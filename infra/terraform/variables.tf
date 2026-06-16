@@ -38,13 +38,13 @@ variable "cloudflare_tunnel_token" {
   type        = string
   description = "The Cloudflare Tunnel token for zero inbound port connectivity"
   sensitive   = true
-  # No default to prevent hardcoding secrets
+  default     = ""
 }
 
 variable "my_ip_cidr" {
   type        = string
   description = "Your local machine IP in CIDR notation for SSH access restriction (e.g. 203.0.113.5/32)"
-  # No default — must be explicitly set to prevent open SSH access
+  default     = ""
 }
 
 variable "key_pair_name" {
