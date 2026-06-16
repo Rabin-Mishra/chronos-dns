@@ -1,0 +1,24 @@
+groups:
+  - name: chronos_dns_alerts
+    rules:
+      - alert: ProbeSuccessRateLow
+        expr: |
+          (
+            rate(probe_success_total[5m]) /
+            (rate(probe_success_total[5m]) + rate(probe_failures_total[5m]))
+          ) < 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Probe success rate below 90%"
+          description: "Resolver {{ $labels.resolver }} protocol {{ $labels.protocol }} success rate is below 90% for 5 minutes."
+
+      - alert: CertificateExpiringSoon
+        expr: probe_cert_expiry_days < 14
+        for: 1h
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate expiring soon"
+          description: "Resolver {{ $labels.resolver }} certificate expires in less than 14 days."

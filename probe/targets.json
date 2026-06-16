@@ -1,0 +1,38 @@
+[
+  {
+    "ip": "1.1.1.1",
+    "operator": "Cloudflare",
+    "doh_endpoint": "https://cloudflare-dns.com/dns-query",
+    "dot_host": "one.one.one.one:853"
+  },
+  {
+    "ip": "8.8.8.8",
+    "operator": "Google",
+    "doh_endpoint": "https://dns.google/dns-query",
+    "dot_host": "dns.google:853"
+  },
+  {
+    "ip": "9.9.9.9",
+    "operator": "Quad9",
+    "doh_endpoint": "https://dns.quad9.net/dns-query",
+    "dot_host": "dns.quad9.net:853"
+  },
+  {
+    "ip": "94.140.14.14",
+    "operator": "AdGuard",
+    "doh_endpoint": "https://dns.adguard.com/dns-query",
+    "dot_host": "dns.adguard.com:853"
+  },
+  {
+    "ip": "194.242.2.2",
+    "operator": "Mullvad",
+    "doh_endpoint": "https://doh.mullvad.net/dns-query",
+    "dot_host": "doh.mullvad.net:853"
+  },
+  {
+    "ip": "185.228.168.9",
+    "operator": "CleanBrowsing",
+    "doh_endpoint": "https://doh.cleanbrowsing.org/doh/family-filter",
+    "dot_host": "family-filter-dns.cleanbrowsing.org:853"
+  }
+]
