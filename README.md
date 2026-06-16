@@ -369,21 +369,7 @@ GitHub: [github.com/Rabin-Mishra](https://github.com/Rabin-Mishra)
 
 ---
 
-## Status
 
-| Component | Status |
-|---|---|
-| Repository scaffold | ✅ Complete |
-| Terraform infrastructure | 🔨 In progress |
-| Python probe engine | 🔨 In progress |
-| Docker + CI/CD pipeline | 🔨 In progress |
-| Observability stack | 🔨 In progress |
-| Ansible hardening | 🔨 In progress |
-| Grafana dashboards | ⏳ Planned |
-| Multi-region deployment | ⏳ Planned |
-| Research analysis notebooks | ⏳ Planned |
-
----
 
 *Built as a research proof-of-concept. Not intended for production use
 without further security review.*
