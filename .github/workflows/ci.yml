@@ -28,11 +28,12 @@ jobs:
       with:
         python-version: "3.12"
         cache: "pip"
+        cache-dependency-path: "probe/requirements.txt"
 
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install ruff pytest pytest-asyncio fastapi uvicorn httpx dnspython sqlalchemy prometheus-client psycopg2-binary pandas numpy
+        pip install -r probe/requirements.txt ruff pytest pytest-asyncio
 
     - name: Run Linter (Ruff)
       run: ruff check .

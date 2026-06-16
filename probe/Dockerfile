@@ -14,19 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy requirements file first to utilize Docker build cache
+COPY requirements.txt /app/
+
 # Install target python packages directly to the user directory
-# TODO: Pin versions in a requirements.txt file for production
-RUN pip install --no-cache-dir --user \
-    dnspython \
-    httpx \
-    pandas \
-    numpy \
-    fastapi \
-    uvicorn \
-    python-dotenv \
-    prometheus-client \
-    psycopg2-binary \
-    sqlalchemy
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # ==============================================================================
 # Stage 2: Final Runtime Image
