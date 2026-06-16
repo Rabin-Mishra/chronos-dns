@@ -1,0 +1,160 @@
+---
+- name: Harden and configure Chronos-DNS probe node
+  hosts: probe_nodes
+  become: true
+  vars:
+    chronos_dir: /opt/chronos
+    ubuntu_user: ubuntu
+
+  tasks:
+
+    # ── System updates ────────────────────────────────────────────
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: dist
+        autoremove: yes
+
+    # ── Install required packages ─────────────────────────────────
+    - name: Install base packages
+      apt:
+        name:
+          - docker.io
+          - docker-compose-v2
+          - fail2ban
+          - ufw
+          - nginx
+          - curl
+          - unzip
+          - git
+          - python3-pip
+        state: present
+
+    # ── Docker setup ──────────────────────────────────────────────
+    - name: Add ubuntu user to docker group
+      user:
+        name: "{{ ubuntu_user }}"
+        groups: docker
+        append: yes
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    # ── UFW firewall ──────────────────────────────────────────────
+    - name: Set UFW default deny incoming
+      ufw:
+        direction: incoming
+        policy: deny
+
+    - name: Set UFW default allow outgoing
+      ufw:
+        direction: outgoing
+        policy: allow
+
+    - name: Allow SSH
+      ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+
+    - name: Allow HTTPS for Cloudflare Tunnel
+      ufw:
+        rule: allow
+        port: '443'
+        proto: tcp
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    # ── fail2ban ──────────────────────────────────────────────────
+    - name: Configure fail2ban for SSH
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [sshd]
+          enabled = true
+          port = ssh
+          maxretry = 3
+          bantime = 3600
+          findtime = 600
+        mode: '0644'
+
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: restarted
+
+    # ── SSH hardening ─────────────────────────────────────────────
+    - name: Harden SSH configuration
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin no' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+
+    - name: Restart SSH to apply hardening
+      systemd:
+        name: ssh
+        state: restarted
+
+    # ── Application directory ─────────────────────────────────────
+    - name: Create /opt/chronos directory
+      file:
+        path: "{{ chronos_dir }}"
+        state: directory
+        owner: "{{ ubuntu_user }}"
+        group: "{{ ubuntu_user }}"
+        mode: '0755'
+
+    - name: Create /opt/chronos/data directory
+      file:
+        path: "{{ chronos_dir }}/data"
+        state: directory
+        owner: "{{ ubuntu_user }}"
+        group: "{{ ubuntu_user }}"
+        mode: '0755'
+
+    # ── Copy application files ────────────────────────────────────
+    - name: Copy probe docker-compose file
+      copy:
+        src: ../../probe/docker-compose.yml
+        dest: "{{ chronos_dir }}/docker-compose.yml"
+        owner: "{{ ubuntu_user }}"
+        group: "{{ ubuntu_user }}"
+        mode: '0644'
+
+    # ── Cloudflare Tunnel ─────────────────────────────────────────
+    - name: Download cloudflared deb package
+      get_url:
+        url: https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+        dest: /tmp/cloudflared.deb
+        mode: '0644'
+
+    - name: Install cloudflared
+      apt:
+        deb: /tmp/cloudflared.deb
+
+    # ── Final verification ────────────────────────────────────────
+    - name: Verify Docker is running
+      command: docker info
+      register: docker_info
+      changed_when: false
+
+    - name: Print Docker status
+      debug:
+        msg: "Docker is running successfully"
+      when: docker_info.rc == 0
