@@ -48,12 +48,6 @@ locals {
   }
 }
 
-# Key Pair for SSH Access
-resource "aws_key_pair" "probe_key" {
-  key_name   = var.key_pair_name
-  public_key = file(var.ssh_public_key_path)
-  tags       = local.common_tags
-}
 
 # VPC Configuration
 resource "aws_vpc" "main" {
@@ -157,7 +151,7 @@ resource "aws_instance" "probe" {
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.probe_sg.id]
-  key_name               = aws_key_pair.probe_key.key_name
+  key_name               = var.key_pair_name
 
   # Enable resource termination protection for research stability
   disable_api_termination = true
