@@ -55,89 +55,41 @@ using Pandas and NumPy.
 ---
 
 ## Architecture
-┌─────────────────────────────────────────────────────────────────┐
 
-│                        EDGE LAYER                               │
+```mermaid
+graph TD
+    subgraph Edge_Layer [Edge Layer]
+        Probe[Probe Node: EC2 t2.micro]
+        Probe --> |DNS / DoH / DoT Queries| Resolvers[Target Resolvers: targets.json]
+    end
 
-│                                                                 │
+    subgraph Ingestion_Layer [Ingestion Layer]
+        FastAPI[FastAPI /ingest endpoint]
+        ORM[SQLAlchemy ORM]
+        DB[(PostgreSQL on Neon)]
+        
+        Probe --> |Telemetry JSON| FastAPI
+        FastAPI --> ORM
+        ORM --> DB
+    end
 
-│   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐         │
+    subgraph Observability_Layer [Observability Layer]
+        Prometheus[Prometheus]
+        Grafana[Grafana]
+        Alerts[Alerting Engine]
+        
+        Prometheus --> |Scrapes /metrics| FastAPI
+        Grafana --> |Queries TSDB| Prometheus
+        Grafana --> |Queries SQL| DB
+        Alerts --> |Fires if success_rate < 90%| Grafana
+    end
 
-│   │  Probe Node │   │  Probe Node │   │  Probe Node │         │
-
-│   │  EC2 t2.micro│  │  EC2 t2.micro│  │  EC2 t2.micro│        │
-
-│   │  ap-south-1 │   │  (future)   │   │  (future)   │         │
-
-│   └──────┬──────┘   └─────────────┘   └─────────────┘         │
-
-│          │  Python probe.py                                     │
-
-│          │  DNS / DoH / DoT queries → targets.json             │
-
-└──────────┼──────────────────────────────────────────────────────┘
-
-│
-
-│  Cloudflare Tunnel (zero open inbound ports)
-
-│
-
-┌──────────▼──────────────────────────────────────────────────────┐
-
-│                      INGESTION LAYER                            │
-
-│                                                                 │
-
-│   FastAPI /ingest endpoint  ←  probe telemetry (JSON)          │
-
-│   SQLAlchemy ORM                                                │
-
-│   PostgreSQL on Neon (managed, serverless)                      │
-
-│                                                                 │
-
-└──────────┬──────────────────────────────────────────────────────┘
-
-│
-
-┌──────────▼──────────────────────────────────────────────────────┐
-
-│                    OBSERVABILITY LAYER                          │
-
-│                                                                 │
-
-│   Prometheus  →  scrapes /metrics from FastAPI                 │
-
-│   Grafana     →  dashboards (RTT heatmap, success rate,        │
-
-│                  TLS latency P50/P95, cert expiry table)       │
-
-│   Alerting    →  fires if success_rate < 90% for 5 minutes     │
-
-│                                                                 │
-
-└──────────┬──────────────────────────────────────────────────────┘
-
-│
-
-┌──────────▼──────────────────────────────────────────────────────┐
-
-│                      ANALYSIS LAYER                             │
-
-│                                                                 │
-
-│   Pandas + NumPy  →  batch analysis of collected datasets      │
-
-│   Correlation:  DNSSEC presence vs packet loss                 │
-
-│   Correlation:  cipher suite strength vs latency               │
-
-│   Output:  research-grade CSV + visualisation exports          │
-
-│                                                                 │
-
-└─────────────────────────────────────────────────────────────────┘
+    subgraph Analysis_Layer [Analysis Layer]
+        Pandas[Pandas + NumPy]
+        Pandas --> |Batch SQL Query| DB
+        Pandas --> |Output| Research[CSV & Visualizations]
+    end
+```
 
 
 ---
@@ -150,9 +102,9 @@ The following metrics are actively collected by the `chronos-dns-probe` service 
 
 Here is the live Grafana dashboard showing the global DNS resolver query metrics, including Average RTT, Success Rate, TLS Certificate Expiry, and TLS Handshake Latency:
 
-![Grafana Dashboard](assets/grafana_dashboard.png)
+![Grafana Dashboard](./assets/grafana_dashboard.png)
 
-![Grafana Dashboards List](assets/grafana_dashboards_list.png)
+![Grafana Dashboards List](./assets/grafana_dashboards_list.png)
 
 ### Real Resolver Measurements
 
@@ -307,21 +259,14 @@ chronos-dns/
 ---
 
 ## CI/CD Pipeline
-Push to main
 
-│
-
-▼
-
-┌─────────┐    ┌──────────┐    ┌───────────────┐    ┌────────────┐
-
-│  Lint   │ →  │  Test    │ →  │  Docker Build │ →  │  Deploy    │
-
-│  ruff   │    │  pytest  │    │  push to GHCR │    │  SSH → EC2 │
-
-│  check  │    │  coverage│    │  multi-stage  │    │  compose up│
-
-└─────────┘    └──────────┘    └───────────────┘    └────────────┘
+```mermaid
+flowchart LR
+    Push[Push to main] --> Lint[Lint: ruff check]
+    Lint --> Test[Test: pytest]
+    Test --> Build[Docker Build: push to GHCR]
+    Build --> Deploy[Deploy: SSH to EC2 & compose up]
+```
 
 Every push triggers the full pipeline. A failed test blocks deployment.
 Build status and coverage reports appear in the GitHub Actions summary.
