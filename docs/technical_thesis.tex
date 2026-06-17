@@ -11,18 +11,34 @@
 \usepackage{url}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usepackage[most]{tcolorbox}
 \usetikzlibrary{positioning, shapes.geometric, arrows.meta, fit, backgrounds}
+
+% Increase line spacing slightly for better readability
+\renewcommand{\baselinestretch}{1.08}
 
 % Setup TikZ styles for diagrams
 \tikzset{
     base/.style={draw, thick, align=center, minimum height=0.8cm, font=\small},
-    box/.style={base, rectangle, fill=blue!10, text width=2.8cm, rounded corners=3pt},
-    greenbox/.style={base, rectangle, fill=green!10, text width=2.8cm, rounded corners=3pt},
-    redbox/.style={base, rectangle, fill=red!10, text width=2.8cm, rounded corners=3pt},
-    orangebox/.style={base, rectangle, fill=orange!10, text width=2.8cm, rounded corners=3pt},
+    box/.style={base, rectangle, fill=blue!10, text width=3cm, rounded corners=3pt},
+    greenbox/.style={base, rectangle, fill=green!10, text width=3cm, rounded corners=3pt},
+    redbox/.style={base, rectangle, fill=red!10, text width=3cm, rounded corners=3pt},
+    orangebox/.style={base, rectangle, fill=orange!10, text width=3cm, rounded corners=3pt},
     arrow/.style={-Latex, thick},
     dashedarrow/.style={-Latex, thick, dashed},
     line/.style={draw, thick}
+}
+
+% Setup tcolorbox style for bold cards
+\newtcolorbox{mathcard}[1][]{
+  colback=gray!5,
+  colframe=blue!60!black,
+  boxrule=1.5pt,
+  arc=4pt,
+  title=#1,
+  fonttitle=\bfseries\color{white},
+  coltitle=white,
+  halign=center
 }
 
 % ==============================================================================
@@ -67,12 +83,71 @@ To address these vulnerabilities, the Internet Engineering Task Force (IETF) sta
 
 Despite these benefits, the deployment of encrypted DNS introduces complex engineering trade-offs. The transitions from single-packet UDP exchanges to multi-step TCP/TLS handshakes alter latency profiles and connection states, introducing network overhead.
 
-\subsection{Mathematical Formulation of Latency Overhead}
-To study these protocols empirically, we construct a latency model to capture the total elapsed time ($T_{\text{total}}$) for a client-resolver lookup:
+\subsection{Standard Cryptographic Handshake Comparison}
+Figure 1 provides a comparison between plaintext standard DNS resolution and encrypted DNS (DoH/DoT) negotiation stages.
 
+\begin{figure*}[t]
+\centering
+\begin{tikzpicture}[scale=0.92, every node/.style={transform shape}]
+    % Lifelines
+    \draw[ultra thick, gray!40] (0, 0.5) -- (0, -11.5);
+    \draw[ultra thick, gray!40] (8, 0.5) -- (8, -11.5);
+    
+    % Lifeline Headers
+    \node[draw, fill=gray!10, minimum width=2.4cm, minimum height=0.6cm, rounded corners=2pt, font=\bfseries] at (0, 0.8) {Client};
+    \node[draw, fill=gray!10, minimum width=2.4cm, minimum height=0.6cm, rounded corners=2pt, font=\bfseries] at (8, 0.8) {Resolver};
+    \node[draw, fill=gray!10, minimum width=2.4cm, minimum height=0.6cm, rounded corners=2pt, font=\bfseries] at (0, -11.8) {Client};
+    \node[draw, fill=gray!10, minimum width=2.4cm, minimum height=0.6cm, rounded corners=2pt, font=\bfseries] at (8, -11.8) {Resolver};
+
+    % Section 1: Plaintext
+    \node[draw=yellow!80!black, fill=yellow!20, minimum width=7.6cm, minimum height=0.6cm, font=\bfseries\small] at (4, 0) {Plaintext DNS (UDP 53)};
+    
+    \draw[arrow] (0, -1) -- (8, -1) node[midway, above, font=\bfseries\small] {DNS Query};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (0, -1) {1};
+
+    \draw[arrow] (8, -2) -- (0, -2) node[midway, above, font=\bfseries\small] {DNS Response (1 RTT total, stateless)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (8, -2) {2};
+
+    % Section 2: Encrypted
+    \node[draw=yellow!80!black, fill=yellow!20, minimum width=7.6cm, minimum height=0.6cm, font=\bfseries\small] at (4, -3) {Encrypted DNS (DoH/DoT)};
+    
+    \draw[arrow] (0, -4) -- (8, -4) node[midway, above, font=\bfseries\small] {TCP SYN};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (0, -4) {3};
+    
+    \draw[arrow] (8, -5) -- (0, -5) node[midway, above, font=\bfseries\small] {TCP SYN-ACK};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (8, -5) {4};
+    
+    \draw[arrow] (0, -6) -- (8, -6) node[midway, above, font=\bfseries\small] {TCP ACK / TLS ClientHello (TCP Connect)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (0, -6) {5};
+    
+    \draw[arrow] (8, -7) -- (0, -7) node[midway, above, font=\bfseries\small] {TLS ServerHello + Cert (TLS Handshake)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (8, -7) {6};
+    
+    \draw[arrow] (0, -8) -- (8, -8) node[midway, above, font=\bfseries\small] {Cryptographic Key Exchange};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (0, -8) {7};
+    
+    \draw[arrow] (8, -9) -- (0, -9) node[midway, above, font=\bfseries\small] {Finished / Session Ticket};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (8, -9) {8};
+    
+    \draw[arrow] (0, -10) -- (8, -10) node[midway, above, font=\bfseries\small] {Encrypted DNS Query (Application Data)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (0, -10) {9};
+    
+    \draw[arrow] (8, -11) -- (0, -11) node[midway, above, font=\bfseries\small] {Encrypted DNS Response};
+    \node[circle, draw, fill=black, text=white, inner sep=1.8pt, font=\scriptsize\bfseries] at (8, -11) {10};
+\end{tikzpicture}
+\caption{Protocol Negotiation and Flow Comparison (Plaintext vs. Encrypted DNS).}
+\end{figure*}
+
+\subsection{Mathematical Formulation of Latency Overhead}
+To study these protocols empirically, we construct a latency model to capture the total elapsed time ($T_{\text{total}}$) for a client-resolver lookup. The formula is highlighted in the mathematical formulation card below.
+
+\begin{mathcard}[Latency Model Formulation]
+\boldmath
 \begin{equation}
-T_{\text{total}} = T_{\text{TCP\_connect}} + T_{\text{TLS\_handshake}} + T_{\text{query\_rtt}} + T_{\text{crypto\_processing}}
+\mathbf{T_{\text{total}} = T_{\text{TCP\_connect}} + T_{\text{TLS\_handshake}} + T_{\text{query\_rtt}} + T_{\text{crypto\_processing}}}
 \end{equation}
+\unboldmath
+\end{mathcard}
 
 Where:
 \begin{itemize}
@@ -101,22 +176,22 @@ This architecture offers a scalable research proposal for international internet
 The Chronos-DNS platform uses a decoupled, four-tier architecture to support high-performance telemetry gathering, database storage, metrics aggregation, and secure user access.
 
 \subsection{Architectural Component Flow}
-Figure 1 details the core components and flow of data within the system.
+Figure 2 details the core components and flow of data within the system across both columns to prevent text overlapping.
 
-\begin{figure}[h!]
+\begin{figure*}[t]
 \centering
-\begin{tikzpicture}[node distance=1.2cm, auto]
+\begin{tikzpicture}[node distance=1.3cm, auto]
     % Nodes
     \node [box, fill=green!10] (targets) {\textbf{targets.json} \\ Configuration File};
     \node [box, below=0.8cm of targets] (probe) {\textbf{chronos-dns-probe} \\ Engine (FastAPI)};
     
-    \node [box, fill=blue!5, below left=0.8cm and 0.2cm of probe] (dns) {\textbf{measure\_dns} \\ UDP Port 53};
+    \node [box, fill=blue!5, below left=0.8cm and 0.4cm of probe] (dns) {\textbf{measure\_dns} \\ UDP Port 53};
     \node [box, fill=blue!5, below=0.8cm of probe] (doh) {\textbf{measure\_doh} \\ TCP Port 443};
-    \node [box, fill=blue!5, below right=0.8cm and 0.2cm of probe] (dot) {\textbf{measure\_dot} \\ TCP Port 853};
+    \node [box, fill=blue!5, below right=0.8cm and 0.4cm of probe] (dot) {\textbf{measure\_dot} \\ TCP Port 853};
     
     \node [box, fill=orange!10, below=3.2cm of probe] (db) {\textbf{PostgreSQL} \\ Neon Cloud Database};
-    \node [box, fill=red!10, right=1.5cm of db] (prom) {\textbf{Prometheus} \\ Metrics Storage};
-    \node [box, fill=purple!10, right=1.2cm of probe] (grafana) {\textbf{Grafana} \\ Visualization Dashboard};
+    \node [box, fill=red!10, right=1.8cm of db] (prom) {\textbf{Prometheus} \\ Metrics Storage};
+    \node [box, fill=purple!10, right=1.8cm of probe] (grafana) {\textbf{Grafana} \\ Visualization Dashboard};
     
     % Connections
     \draw [arrow] (targets) -- (probe);
@@ -133,7 +208,7 @@ Figure 1 details the core components and flow of data within the system.
     \draw [arrow] (grafana) -- (db);
 \end{tikzpicture}
 \caption{Chronos-DNS Component Architecture Diagram.}
-\end{figure}
+\end{figure*}
 
 \subsection{Component Selection Rationale}
 \subsubsection{Asynchronous Query Core (Python, FastAPI, and Asyncio)}
@@ -154,11 +229,11 @@ Production services must be protected from external attacks. Traditionally, expo
 \section{Network Topology \& Ingress Security}
 The host node is hardened using a zero-inbound network model, ensuring that the database, metrics collectors, and API handlers are isolated from public network segments.
 
-Figure 2 shows the network layout and path for user traffic.
+Figure 3 shows the network layout and path for user traffic, scaled as a double-column block.
 
-\begin{figure}[h!]
+\begin{figure*}[t]
 \centering
-\begin{tikzpicture}[node distance=1.2cm, auto]
+\begin{tikzpicture}[node distance=1.3cm, auto]
     % User
     \node [box, fill=orange!10] (user) {\textbf{Researcher / User} \\ Browser Access};
     
@@ -169,16 +244,14 @@ Figure 2 shows the network layout and path for user traffic.
     \node [box, fill=green!10, below=1.2cm of cf] (tunnel) {\textbf{cloudflared client} \\ Outbound QUIC/TCP};
     
     % Docker network
-    \node [box, fill=blue!5, left=1.2cm of tunnel] (grafana) {\textbf{Grafana} \\ Port 3000};
+    \node [box, fill=blue!5, left=1.8cm of tunnel] (grafana) {\textbf{Grafana} \\ Port 3000};
     \node [box, fill=blue!5, below=0.8cm of grafana] (prom) {\textbf{Prometheus} \\ Port 9090};
     \node [box, fill=blue!5, below=0.8cm of tunnel] (probe) {\textbf{Probe API} \\ Port 8000};
     
     % Background box for EC2 Host Security Group
-    \begin{backgroundpage}
-        \begin{scope}[on background layer]
-            \node [draw, dashed, thick, blue!50, fill=blue!2, fit=(tunnel) (grafana) (prom) (probe), label={[shift={(0,-0.4)}, font=\scriptsize]below:Hardened EC2 Production Node}] (ec2) {};
-        \end{scope}
-    \end{backgroundpage}
+    \begin{scope}[on background layer]
+        \node [draw, dashed, thick, blue!50, fill=blue!2, fit=(tunnel) (grafana) (prom) (probe), label={[shift={(0,-0.4)}, font=\scriptsize]below:Hardened EC2 Production Node}] (ec2) {};
+    \end{scope}
 
     % Connections
     \draw [arrow] (user) -- (cf);
@@ -188,7 +261,7 @@ Figure 2 shows the network layout and path for user traffic.
     \draw [arrow] (prom) -- (probe);
 \end{tikzpicture}
 \caption{Zero-Trust Outbound Ingress Network Topology.}
-\end{figure}
+\end{figure*}
 
 \subsection{Perimeter Security Controls}
 \begin{itemize}
@@ -204,35 +277,87 @@ Figure 2 shows the network layout and path for user traffic.
 The system implementation contains decoupled handlers for the database schema, query engine, and REST API routing logic.
 
 \subsection{Asynchronous Core Query Execution Sequence}
-Figure 3 details the execution steps for resolving queries concurrently.
+Figure 4 details the execution steps for resolving queries concurrently within the asynchronous engine.
 
-\begin{figure}[h!]
+\begin{figure*}[t]
 \centering
-\begin{tikzpicture}[scale=0.8, every node/.style={transform shape}]
+\begin{tikzpicture}[scale=0.87, every node/.style={transform shape}]
     % Lifelines
-    \draw [line] (0,0) -- (0,-6.5) node[below] {Probe Loop};
-    \draw [line] (3,0) -- (3,-6.5) node[below] {Executor Pool};
-    \draw [line] (6,0) -- (6,-6.5) node[below] {Socket Layer};
-    \draw [line] (9,0) -- (9,-6.5) node[below] {Resolver End};
+    \draw[ultra thick, gray!40] (0, 0) -- (0, -14.5);
+    \draw[ultra thick, gray!40] (3.5, 0) -- (3.5, -14.5);
+    \draw[ultra thick, gray!40] (7.0, 0) -- (7.0, -14.5);
+    \draw[ultra thick, gray!40] (10.5, 0) -- (10.5, -14.5);
     
-    % Labels
-    \node [above] at (0,0) {\textbf{Probe Loop}};
-    \node [above] at (3,0) {\textbf{Executor Pool}};
-    \node [above] at (6,0) {\textbf{Socket Layer}};
-    \node [above] at (9,0) {\textbf{Resolver End}};
+    % Headers
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (0, 0.4) {Probe Engine\\Event Loop};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (3.5, 0.4) {Thread Pool\\Executor};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (7.0, 0.4) {Network Socket\\Layer};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (10.5, 0.4) {Target Resolver\\Endpoint};
+    
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (0, -14.9) {Probe Engine\\Event Loop};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (3.5, -14.9) {Thread Pool\\Executor};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (7.0, -14.9) {Network Socket\\Layer};
+    \node[draw, fill=gray!10, text width=2.6cm, align=center, minimum height=0.6cm, rounded corners=2pt, font=\scriptsize\bfseries] at (10.5, -14.9) {Target Resolver\\Endpoint};
 
-    % Messages
-    \draw [arrow] (0,-1) -- node[above, font=\scriptsize] {run\_in\_executor()} (3,-1);
-    \draw [arrow] (3,-1.8) -- node[above, font=\scriptsize] {connect(TCP 853)} (6,-1.8);
-    \draw [arrow] (6,-2.6) -- node[above, font=\scriptsize] {SYN} (9,-2.6);
-    \draw [dashedarrow] (9,-3.2) -- node[above, font=\scriptsize] {SYN-ACK} (6,-3.2);
-    \draw [arrow] (6,-4.0) -- node[above, font=\scriptsize] {TLS ClientHello} (9,-4.0);
-    \draw [dashedarrow] (9,-4.8) -- node[above, font=\scriptsize] {ServerHello + Cert} (6,-4.8);
-    \draw [arrow] (6,-5.5) -- node[above, font=\scriptsize] {Query (google.com A)} (9,-5.5);
-    \draw [dashedarrow] (9,-6.2) -- node[above, font=\scriptsize] {DNS Response} (0,-6.2);
+    % Step 0: Yellow box - Start Asynchronous Query Cycle
+    \node[draw=yellow!80!black, fill=yellow!20, minimum height=0.45cm, font=\scriptsize, anchor=west] at (-1.0, -0.6) {Start Asynchronous Query Cycle};
+
+    % Message 1
+    \draw[arrow] (0, -1.5) -- (3.5, -1.5) node[midway, above, font=\scriptsize] {run\_in\_executor(do\_dot\_query)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (0, -1.5) {1};
+
+    % Message 2
+    \draw[arrow] (3.5, -2.5) -- (7.0, -2.5) node[midway, above, font=\scriptsize] {socket.create\_connection(TCP 853)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (3.5, -2.5) {2};
+
+    % Message 3
+    \draw[arrow] (7.0, -3.5) -- (10.5, -3.5) node[midway, above, font=\scriptsize] {SYN Packet};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (7.0, -3.5) {3};
+
+    % Message 4
+    \draw[dashedarrow] (10.5, -4.5) -- (7.0, -4.5) node[midway, above, font=\scriptsize] {SYN-ACK Packet};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (10.5, -4.5) {4};
+
+    % Message 5
+    \draw[dashedarrow] (7.0, -5.5) -- (3.5, -5.5) node[midway, above, font=\scriptsize] {Connection Established (T\_TCP\_connect)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (7.0, -5.5) {5};
+
+    % Message 6
+    \draw[arrow] (3.5, -6.5) -- (7.0, -6.5) node[midway, above, font=\scriptsize] {ssl.wrap\_socket(sock)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (3.5, -6.5) {6};
+
+    % Message 7
+    \draw[arrow] (7.0, -7.5) -- (10.5, -7.5) node[midway, above, font=\scriptsize] {TLS ClientHello};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (7.0, -7.5) {7};
+
+    % Message 8
+    \draw[dashedarrow] (10.5, -8.5) -- (7.0, -8.5) node[midway, above, font=\scriptsize] {TLS ServerHello + X.509 Certificate};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (10.5, -8.5) {8};
+
+    % Message 9
+    \draw[dashedarrow] (7.0, -9.5) -- (3.5, -9.5) node[midway, above, font=\scriptsize] {Handshake Finalized (T\_TLS\_handshake)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (7.0, -9.5) {9};
+
+    % Yellow box - Extract X.509 cert expiration details
+    \node[draw=yellow!80!black, fill=yellow!20, minimum height=0.45cm, font=\scriptsize] at (3.5, -10.5) {Extract X.509 cert expiration details};
+
+    % Message 10
+    \draw[arrow] (3.5, -11.5) -- (10.5, -11.5) node[midway, above, font=\scriptsize] {Send DNS Query Payload (google.com A)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (3.5, -11.5) {10};
+
+    % Message 11
+    \draw[dashedarrow] (10.5, -12.5) -- (3.5, -12.5) node[midway, above, font=\scriptsize] {Receive DNS Response Payload};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (10.5, -12.5) {11};
+
+    % Message 12
+    \draw[dashedarrow] (3.5, -13.5) -- (0, -13.5) node[midway, above, font=\scriptsize] {Return metrics (RTT, Handshake, Expiry, Success)};
+    \node[circle, draw, fill=black, text=white, inner sep=1.2pt, font=\tiny\bfseries] at (3.5, -13.5) {12};
+
+    % Yellow box - Update Prometheus Registry & Ingest to PostgreSQL
+    \node[draw=yellow!80!black, fill=yellow!20, minimum height=0.45cm, font=\scriptsize, anchor=west] at (-1.0, -14.2) {Update Prometheus Registry \& Ingest to PostgreSQL};
 \end{tikzpicture}
-\caption{DoT Latency Measurement Sequence Diagram.}
-\end{figure}
+\caption{DoT Latency Measurement Sequence Diagram Flow.}
+\end{figure*}
 
 The asynchronous event loop delegates blocker network calls to the thread pool executor to maintain high-frequency resolution rates.
 
@@ -242,15 +367,15 @@ The asynchronous event loop delegates blocker network calls to the thread pool e
 \section{CI/CD Deployment Pipeline}
 The deployment pipeline automates validation testing, container builds, security auditing, and deployment to the host.
 
-\begin{figure}[h!]
+\begin{figure*}[t]
 \centering
-\begin{tikzpicture}[node distance=1.2cm, auto]
-    % Pipeline nodes
+\begin{tikzpicture}[node distance=2.2cm, auto, >=Latex]
+    % Pipeline nodes (horizontal layout)
     \node [box, fill=blue!10] (push) {\textbf{Git Commit / Push}};
-    \node [box, fill=green!10, below=0.6cm of push] (lint) {\textbf{Lint \& Format} \\ Ruff validate};
-    \node [box, fill=green!10, below=0.6cm of lint] (test) {\textbf{Unit Tests} \\ pytest suite};
-    \node [box, fill=green!10, below=0.6cm of test] (build) {\textbf{Docker Build} \\ Push to GHCR};
-    \node [box, fill=orange!10, below=0.6cm of build] (deploy) {\textbf{Ansible Deploy} \\ SSH to EC2 Host};
+    \node [box, fill=green!10, right=0.8cm of push] (lint) {\textbf{Lint \& Format} \\ Ruff validation};
+    \node [box, fill=green!10, right=0.8cm of lint] (test) {\textbf{Unit Tests} \\ pytest execution};
+    \node [box, fill=green!10, right=0.8cm of test] (build) {\textbf{Docker Build} \\ Push to GHCR};
+    \node [box, fill=orange!10, right=0.8cm of build] (deploy) {\textbf{Ansible Deploy} \\ SSH to EC2 Host};
     
     % Connections
     \draw [arrow] (push) -- (lint);
@@ -258,8 +383,8 @@ The deployment pipeline automates validation testing, container builds, security
     \draw [arrow] (test) -- (build);
     \draw [arrow] (build) -- (deploy);
 \end{tikzpicture}
-\caption{Continuous Integration and Continuous Deployment Workflow.}
-\end{figure}
+\caption{Continuous Integration and Continuous Deployment Workflow (Horizontal Flow Layout).}
+\end{figure*}
 
 All tests must pass in the isolated GitHub Actions runner environment before images are built and pushed to the registry.
 
