@@ -55,5 +55,9 @@ RUN mkdir -p /app/data && chown chronos:chronos /app/data
 # Switch to the non-root runner user
 USER chronos
 
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" \
+  || exit 1
+
 # Execute the probe application
 CMD ["uvicorn", "probe:app", "--host", "0.0.0.0", "--port", "8000"]

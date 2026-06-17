@@ -75,26 +75,9 @@ def test_load_targets() -> None:
     """
     Tests loading resolver targets from targets.json.
     """
-    targets_data = [
-        {
-            "ip": "1.1.1.1",
-            "operator": "Cloudflare",
-            "doh_endpoint": "https://cloudflare-dns.com/dns-query",
-            "dot_host": "one.one.one.one:853"
-        }
-    ]
-    with tempfile.NamedTemporaryFile(mode="w+", suffix=".json", delete=False) as tmp:
-        json.dump(targets_data, tmp)
-        tmp_path = tmp.name
-
-    try:
-        loaded = load_targets(tmp_path)
-        assert len(loaded) == 1
-        assert loaded[0]["operator"] == "Cloudflare"
-        assert loaded[0]["ip"] == "1.1.1.1"
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+    targets = load_targets("targets.json")
+    assert len(targets) == 6
+    assert targets[0]["operator"] == "Cloudflare"
 
 def test_metrics_endpoint(client) -> None:
     """
@@ -102,7 +85,7 @@ def test_metrics_endpoint(client) -> None:
     """
     response = client.get("/metrics")
     assert response.status_code == 200
-    assert "text/plain" in response.headers.get("content-type", "")
+    assert "probe_rtt" in response.text
 
 def test_ingest_telemetry(client, db_session) -> None:
     """

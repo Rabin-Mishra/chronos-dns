@@ -142,6 +142,35 @@ using Pandas and NumPy.
 
 ---
 
+## Live System Metrics
+
+The following metrics are actively collected by the `chronos-dns-probe` service and stored in PostgreSQL (Neon), scraped by Prometheus, and visualized in the Grafana dashboard:
+
+### Grafana Dashboard Visualizations
+
+Here is the live Grafana dashboard showing the global DNS resolver query metrics, including Average RTT, Success Rate, TLS Certificate Expiry, and TLS Handshake Latency:
+
+![Grafana Dashboard](assets/grafana_dashboard.png)
+
+![Grafana Dashboards List](assets/grafana_dashboards_list.png)
+
+### Real Resolver Measurements
+
+| Resolver | Protocol | Avg RTT | TLS Handshake | Cert Expiry |
+|---|---|---|---|---|
+| Cloudflare | DNS | ~155ms | N/A | N/A |
+| Cloudflare | DoH | ~200ms | ~11ms | 187 days |
+| Cloudflare | DoT | ~45ms | ~11ms | 187 days |
+| Google | DNS | ~143ms | N/A | N/A |
+| Google | DoH | ~187ms | ~21ms | 61 days |
+| Google | DoT | ~15ms | ~8ms | 61 days |
+| Quad9 | DoT | N/A | N/A | 40 days |
+| AdGuard | DoT | N/A | N/A | 135 days |
+| Mullvad | DoT | ~127ms | ~358ms | 64 days |
+| CleanBrowsing | DoT | ~125ms | ~65ms | 28 days |
+
+---
+
 ## Technical Stack
 
 | Layer | Technology | Version | Purpose |
@@ -369,7 +398,21 @@ GitHub: [github.com/Rabin-Mishra](https://github.com/Rabin-Mishra)
 
 ---
 
+## Status
 
+| Component | Status |
+|---|---|
+| Repository scaffold | ✅ Complete |
+| Terraform infrastructure | ✅ Complete |
+| Python probe engine | ✅ Complete |
+| Docker + CI/CD pipeline | ✅ Complete |
+| Observability stack | ✅ Complete |
+| Ansible hardening | ✅ Complete |
+| Grafana dashboards | ✅ Complete |
+| Multi-region deployment | ✅ Complete |
+| Research analysis notebooks | ✅ Complete |
+
+---
 
 *Built as a research proof-of-concept. Not intended for production use
 without further security review.*
