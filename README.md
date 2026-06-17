@@ -147,89 +147,49 @@ Here is the live Grafana dashboard showing the global DNS resolver query metrics
 ---
 
 ## Repository Structure
-chronos-dns/
 
-│
+```mermaid
+graph TD
+    %% Node Definitions
+    root[chronos-dns/]
+    infra[infra/ - Infrastructure as Code]
+    tf[terraform/ - AWS Provisioning]
+    ans[ansible/ - Host Configuration]
+    probe[probe/ - Core Python Measurement Engine]
+    tests[tests/ - Pytest Suite]
+    observe[observe/ - Observability Stack]
+    grafana[grafana/ - Provisions & Dashboards]
+    github[.github/workflows/ - CI/CD Pipelines]
+    
+    %% Root Links
+    root --> infra
+    root --> probe
+    root --> observe
+    root --> github
+    root --> env[.env.example]
+    root --> gitignore[.gitignore]
+    root --> agents[AGENTS.md]
+    root --> readme[README.md]
 
-├── infra/                          # Infrastructure as Code
+    %% Infra Subnodes
+    infra --> tf
+    infra --> ans
+    tf --> tf_files[main.tf, variables.tf, outputs.tf, backend.tf]
+    tf --> tf_modules[modules/state/]
+    ans --> ans_files[playbook.yml, inventory.ini]
 
-│   ├── terraform/
+    %% Probe Subnodes
+    probe --> probe_files[probe.py, models.py, targets.json, Dockerfile, docker-compose.yml]
+    probe --> tests
+    tests --> tests_files[test_probe.py]
 
-│   │   ├── main.tf                 # VPC, EC2, Security Groups
+    %% Observe Subnodes
+    observe --> obs_files[prometheus.yml, docker-compose.yml]
+    observe --> grafana
 
-│   │   ├── variables.tf            # Input variables
-
-│   │   ├── outputs.tf              # EC2 IP, instance ID
-
-│   │   ├── backend.tf              # S3 remote state config
-
-│   │   └── modules/
-
-│   │       └── state/              # S3 + DynamoDB state module
-
-│   └── ansible/
-
-│       ├── playbook.yml            # Master playbook
-
-│       └── roles/
-
-│           ├── harden/             # UFW, fail2ban, SSH hardening
-
-│           ├── docker/             # Docker Engine install
-
-│           └── cloudflared/        # Cloudflare Tunnel setup
-
-│
-
-├── probe/                          # Measurement probe
-
-│   ├── probe.py                    # Core query engine (DNS/DoH/DoT)
-
-│   ├── models.py                   # SQLAlchemy database models
-
-│   ├── targets.json                # List of resolvers to measure
-
-│   ├── Dockerfile                  # Multi-stage, non-root, <150MB
-
-│   ├── docker-compose.yml          # Probe + local postgres for dev
-
-│   └── tests/
-
-│       └── test_probe.py           # pytest test suite
-
-│
-
-├── observe/                        # Observability stack
-
-│   ├── prometheus.yml              # Scrape config + alert rules
-
-│   ├── docker-compose.yml          # Prometheus + Grafana + node-exporter
-
-│   └── grafana/
-
-│       └── provisioning/
-
-│           ├── datasources/        # Auto-provision Prometheus source
-
-│           └── dashboards/         # Chronos-DNS dashboard JSON
-
-│
-
-├── .github/
-
-│   └── workflows/
-
-│       └── ci.yml                  # Lint → test → build → deploy
-
-│
-
-├── .env.example                    # Variable names, no real secrets
-
-├── .gitignore                      # Python, Terraform, env, OS files
-
-├── AGENTS.md                       # AI agent context and rules
-
-└── README.md                       # This file
+    %% GitHub Subnodes
+    github --> github_files[ci.yml]
+```
 
 ---
 
