@@ -23,22 +23,22 @@ To address these vulnerabilities, the Internet Engineering Task Force (IETF) sta
 
 Despite these benefits, the deployment of encrypted DNS introduces complex engineering trade-offs. The transitions from single-packet UDP exchanges to multi-step TCP/TLS handshakes alter latency profiles and connection states, introducing network overhead:
 
-```
-[Plaintext DNS (UDP 53)]
-Client                Resolver
-  │ ─── DNS Query ────> │
-  │ <── DNS Response ── │ (1 RTT total, stateless)
+```mermaid
+sequenceDiagram
+    autonumber
+    Note over Client, Resolver: Plaintext DNS (UDP 53)
+    Client->>Resolver: DNS Query
+    Resolver->>Client: DNS Response (1 RTT total, stateless)
 
-[Encrypted DNS (DoH/DoT)]
-Client                                     Resolver
-  │ ────────── TCP Syn ──────────────────────> │
-  │ <───────── TCP Syn-Ack ─────────────────── │
-  │ ────────── TCP Ack / TLS ClientHello ────> │ (TCP Connect)
-  │ <───────── TLS ServerHello + Cert ──────── │ (TLS Handshake)
-  │ ────────── Cryptographic Key Exchange ───> │
-  │ <───────── Finished / Session Ticket ───── │
-  │ ────────── Encrypted DNS Query ──────────> │ (Application Data)
-  │ <───────── Encrypted DNS Response ──────── │
+    Note over Client, Resolver: Encrypted DNS (DoH/DoT)
+    Client->>Resolver: TCP SYN
+    Resolver->>Client: TCP SYN-ACK
+    Client->>Resolver: TCP ACK / TLS ClientHello (TCP Connect)
+    Resolver->>Client: TLS ServerHello + Cert (TLS Handshake)
+    Client->>Resolver: Cryptographic Key Exchange
+    Resolver->>Client: Finished / Session Ticket
+    Client->>Resolver: Encrypted DNS Query (Application Data)
+    Resolver->>Client: Encrypted DNS Response
 ```
 
 ### 1.2 Mathematical Formulation of Latency Overhead
