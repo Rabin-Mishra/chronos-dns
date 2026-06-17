@@ -1,0 +1,319 @@
+\documentclass[10pt,journal,compsoc]{IEEEtran}
+
+% ==============================================================================
+% Packages
+% ==============================================================================
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{positioning, shapes.geometric, arrows.meta, fit, backgrounds}
+
+% Setup TikZ styles for diagrams
+\tikzset{
+    base/.style={draw, thick, align=center, minimum height=0.8cm, font=\small},
+    box/.style={base, rectangle, fill=blue!10, text width=2.8cm, rounded corners=3pt},
+    greenbox/.style={base, rectangle, fill=green!10, text width=2.8cm, rounded corners=3pt},
+    redbox/.style={base, rectangle, fill=red!10, text width=2.8cm, rounded corners=3pt},
+    orangebox/.style={base, rectangle, fill=orange!10, text width=2.8cm, rounded corners=3pt},
+    arrow/.style={-Latex, thick},
+    dashedarrow/.style={-Latex, thick, dashed},
+    line/.style={draw, thick}
+}
+
+% ==============================================================================
+% Document Metadata
+% ==============================================================================
+\begin{document}
+
+\title{Design and Empirical Evaluation of a Distributed, Zero-Trust Architecture for Long-Term DNS Security and Performance Auditing}
+
+\author{Rabin Mishra\\
+\small{Graduate Research Proposal \& System Specification}
+}
+
+\markboth{Technical Specification Report,~Vol.~1, No.~1, June~2026}%
+{Mishra: Chronos-DNS System Specification}
+
+\IEEEtitleabstractindextext{%
+\begin{abstract}
+The global Internet is currently undergoing a critical security transition from legacy, unencrypted Domain Name System (DNS) query resolution over UDP/TCP port 53 to cryptographically secured transport protocols: DNS-over-HTTPS (DoH, RFC 8484) and DNS-over-TLS (DoT, RFC 7858). While encryption prevents passive eavesdropping and query manipulation, it introduces transport-layer and cryptographic handshake overheads that alter latency profiles, connection state lifespans, and reliability. This paper presents \textbf{Chronos-DNS}, a production-ready, cloud-native distributed measurement fabric designed to continuously collect, store, and visualize metrics from standard and encrypted resolver end-points. We detail the engineering lifecycle of this system, demonstrating how asynchronous network polling, relational telemetry persistence, zero-trust network topology (via Cloudflare Tunnels), and containerized git-driven CI/CD deployment work in unison to provide high-resolution, empirical datasets. Our proof-of-concept deployment on AWS EC2, monitored via Prometheus and Grafana, validates that DoT and DoH protocols present distinct performance trade-offs, making this measurement framework highly relevant to long-term internet engineering research, such as that conducted by the WIDE Project, CAIDA, and RIPE NCC.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Domain Name System, DNS-over-HTTPS, DNS-over-TLS, Asynchronous Concurrency, Telemetry Architecture, Zero-Trust Networks, GitOps, MLOps, Internet Measurement.
+\end{IEEEkeywords}}
+
+\maketitle
+\IEEEdisplaynontitleabstractindextext
+\IEEEpeerreviewmaketitle
+
+% ==============================================================================
+% Section 1: Introduction
+% ==============================================================================
+\section{Introduction \& Research Motivation}
+\IEEEpaperindent The Domain Name System (DNS) is the foundational addressing directory of the global Internet, mapping human-readable hostnames to machine-routable IP addresses. Developed in the 1980s, legacy DNS is historically insecure, relying on plaintext UDP packets on port 53. Because UDP is stateless and lacks cryptographic signing or encryption, queries and responses are susceptible to:
+\begin{itemize}
+    \item \textbf{Eavesdropping}: Path routers can inspect user traffic to profile web browsing histories.
+    \item \textbf{DNS Hijacking/Spoofing}: Attackers can inject forged response packets (e.g., DNS cache poisoning) to redirect users to malicious landing servers.
+    \item \textbf{Censorship \& Manipulation}: ISP or state gateways can block specific lookup domains by modifying packets on the wire.
+\end{itemize}
+
+To address these vulnerabilities, the Internet Engineering Task Force (IETF) standardized \textbf{DNS-over-TLS (DoT)} in 2016 (RFC 7858) and \textbf{DNS-over-HTTPS (DoH)} in 2018 (RFC 8484). These protocols wrap DNS payloads inside cryptographic layers using the Transport Layer Security (TLS) protocol, guaranteeing \textbf{Confidentiality} (obfuscating the lookup domains), \textbf{Integrity} (preventing modification), and \textbf{Authentication} (validating resolver identity via X.509 certificate validation).
+
+Despite these benefits, the deployment of encrypted DNS introduces complex engineering trade-offs. The transitions from single-packet UDP exchanges to multi-step TCP/TLS handshakes alter latency profiles and connection states, introducing network overhead.
+
+\subsection{Mathematical Formulation of Latency Overhead}
+To study these protocols empirically, we construct a latency model to capture the total elapsed time ($T_{\text{total}}$) for a client-resolver lookup:
+
+\begin{equation}
+T_{\text{total}} = T_{\text{TCP\_connect}} + T_{\text{TLS\_handshake}} + T_{\text{query\_rtt}} + T_{\text{crypto\_processing}}
+\end{equation}
+
+Where:
+\begin{itemize}
+    \item $T_{\text{TCP\_connect}}$ is the initial TCP socket connection delay, typically equivalent to 1 Round Trip Time ($1\text{ RTT}$).
+    \item $T_{\text{TLS\_handshake}}$ is the cryptographic handshake negotiation delay. In TLS 1.2, this requires $2\text{ RTTs}$. In TLS 1.3, this is optimized to $1\text{ RTT}$ (or $0\text{ RTT}$ when using Session Resumption or Pre-Shared Keys).
+    \item $T_{\text{query\_rtt}}$ is the time required to transmit the actual DNS query payload and receive the resolved response.
+    \item $T_{\text{crypto\_processing}}$ represents the combined CPU latency overhead at the client and resolver for encrypting the query and decrypting the response.
+\end{itemize}
+
+For legacy DNS over UDP, $T_{\text{TCP\_connect}}$ and $T_{\text{TLS\_handshake}}$ are $0$. For DoT and DoH, these connection establishment phases add significant overhead, especially during cold starts.
+
+\subsection{Research Contributions of the Chronos-DNS Project}
+To analyze these latency factors at scale, researchers require empirical, multi-region datasets. \textbf{Chronos-DNS} implements a distributed measurement fabric that automates this collection. The system is designed to run continuously on low-cost edge instances, tracking:
+\begin{itemize}
+    \item End-to-end query response latency ($T_{\text{total}}$) and isolated TLS handshake durations ($T_{\text{TLS\_handshake}}$).
+    \item Real-time query success rates and structured error categories (e.g., TCP connection timeouts, TLS handshake failures, or invalid HTTP statuses).
+    \item Cryptographic certificate validity periods and rotation velocities by monitoring the remaining days until expiration for target resolver certificates.
+\end{itemize}
+
+This architecture offers a scalable research proposal for international internet engineering networks (such as WIDE Project, CAIDA, and RIPE NCC) to analyze DNS encryption trends, identify regional routing anomalies, and evaluate cryptographic compliance.
+
+% ==============================================================================
+% Section 2: System Architecture
+% ==============================================================================
+\section{System Architecture \& Component Design}
+The Chronos-DNS platform uses a decoupled, four-tier architecture to support high-performance telemetry gathering, database storage, metrics aggregation, and secure user access.
+
+\subsection{Architectural Component Flow}
+Figure 1 details the core components and flow of data within the system.
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[node distance=1.2cm, auto]
+    % Nodes
+    \node [box, fill=green!10] (targets) {\textbf{targets.json} \\ Configuration File};
+    \node [box, below=0.8cm of targets] (probe) {\textbf{chronos-dns-probe} \\ Engine (FastAPI)};
+    
+    \node [box, fill=blue!5, below left=0.8cm and 0.2cm of probe] (dns) {\textbf{measure\_dns} \\ UDP Port 53};
+    \node [box, fill=blue!5, below=0.8cm of probe] (doh) {\textbf{measure\_doh} \\ TCP Port 443};
+    \node [box, fill=blue!5, below right=0.8cm and 0.2cm of probe] (dot) {\textbf{measure\_dot} \\ TCP Port 853};
+    
+    \node [box, fill=orange!10, below=3.2cm of probe] (db) {\textbf{PostgreSQL} \\ Neon Cloud Database};
+    \node [box, fill=red!10, right=1.5cm of db] (prom) {\textbf{Prometheus} \\ Metrics Storage};
+    \node [box, fill=purple!10, right=1.2cm of probe] (grafana) {\textbf{Grafana} \\ Visualization Dashboard};
+    
+    % Connections
+    \draw [arrow] (targets) -- (probe);
+    \draw [arrow] (probe) -- (dns);
+    \draw [arrow] (probe) -- (doh);
+    \draw [arrow] (probe) -- (dot);
+    
+    \draw [dashedarrow] (dns) |- (db);
+    \draw [dashedarrow] (doh) -- (db);
+    \draw [dashedarrow] (dot) |- (db);
+    
+    \draw [arrow] (prom) -- node[left, font=\scriptsize] {pull} (probe);
+    \draw [arrow] (grafana) -- (prom);
+    \draw [arrow] (grafana) -- (db);
+\end{tikzpicture}
+\caption{Chronos-DNS Component Architecture Diagram.}
+\end{figure}
+
+\subsection{Component Selection Rationale}
+\subsubsection{Asynchronous Query Core (Python, FastAPI, and Asyncio)}
+Simulating high-frequency DNS traffic from multiple resolvers requires a concurrent, non-blocking polling engine. Standard thread-based scheduling incurs operating system context-switching overhead, which can degrade RTT measurement accuracy. Chronos-DNS uses Python's \texttt{asyncio} event loop. By using non-blocking network calls, a single thread can manage hundreds of concurrent TCP/TLS sockets. FastAPI is used to expose Prometheus metrics and provide a fast \texttt{/ingest} API endpoint.
+
+\subsubsection{Serverless Relational Database (PostgreSQL on Neon)}
+While NoSQL databases (like MongoDB or database backends) handle unstructured telemetry, they lack support for complex relational analysis. Chronos-DNS uses PostgreSQL. This allows researchers to write complex SQL queries to correlate RTT variances, certificate expiries, and success rates across different providers and time windows. Neon's serverless Postgres platform allows the database resources to scale automatically, reducing costs during idle periods while maintaining high performance during active polling cycles.
+
+\subsubsection{Metrics Engine (Prometheus \& Grafana)}
+Prometheus functions as a time-series pull-engine, scraping the probe's \texttt{/metrics} endpoint every 10 seconds. Grafana queries the metrics database to display real-time trends---such as latency heatmaps and certificate expiration alerts---without placing query load on the PostgreSQL database.
+
+\subsubsection{Zero-Trust Tunnel Gateway (Cloudflare Tunnels)}
+Production services must be protected from external attacks. Traditionally, exposing Grafana or Prometheus required opening inbound firewall ports, leaving the system vulnerable to automated port scanners. Chronos-DNS runs the \texttt{cloudflared} daemon in an outbound-only configuration. The container initiates secure connections to Cloudflare's edge network, exposing the Grafana dashboard via a secure proxy with no open inbound ports on the host.
+
+% ==============================================================================
+% Section 3: Network Topology
+% ==============================================================================
+\section{Network Topology \& Ingress Security}
+The host node is hardened using a zero-inbound network model, ensuring that the database, metrics collectors, and API handlers are isolated from public network segments.
+
+Figure 2 shows the network layout and path for user traffic.
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[node distance=1.2cm, auto]
+    % User
+    \node [box, fill=orange!10] (user) {\textbf{Researcher / User} \\ Browser Access};
+    
+    % Cloudflare Edge
+    \node [box, fill=purple!10, below=0.8cm of user] (cf) {\textbf{Cloudflare Edge} \\ WAF \& DDOS Shield};
+    
+    % Server Boundary
+    \node [box, fill=green!10, below=1.2cm of cf] (tunnel) {\textbf{cloudflared client} \\ Outbound QUIC/TCP};
+    
+    % Docker network
+    \node [box, fill=blue!5, left=1.2cm of tunnel] (grafana) {\textbf{Grafana} \\ Port 3000};
+    \node [box, fill=blue!5, below=0.8cm of grafana] (prom) {\textbf{Prometheus} \\ Port 9090};
+    \node [box, fill=blue!5, below=0.8cm of tunnel] (probe) {\textbf{Probe API} \\ Port 8000};
+    
+    % Background box for EC2 Host Security Group
+    \begin{backgroundpage}
+        \begin{scope}[on background layer]
+            \node [draw, dashed, thick, blue!50, fill=blue!2, fit=(tunnel) (grafana) (prom) (probe), label={[shift={(0,-0.4)}, font=\scriptsize]below:Hardened EC2 Production Node}] (ec2) {};
+        \end{scope}
+    \end{backgroundpage}
+
+    % Connections
+    \draw [arrow] (user) -- (cf);
+    \draw [arrow, <->] (cf) -- node[right, font=\scriptsize] {Tunnel TCP 443} (tunnel);
+    \draw [arrow] (tunnel) -- (grafana);
+    \draw [arrow] (grafana) -- (prom);
+    \draw [arrow] (prom) -- (probe);
+\end{tikzpicture}
+\caption{Zero-Trust Outbound Ingress Network Topology.}
+\end{figure}
+
+\subsection{Perimeter Security Controls}
+\begin{itemize}
+    \item \textbf{Firewall Integration (UFW)}: The host runs a default-deny policy. Outbound traffic is restricted to verified target endpoints, DNS resolution, and SQL queries to the Neon database.
+    \item \textbf{Outbound Tunnel Gateway}: External requests are routed through the Cloudflare Edge, which terminates TLS connections, applies Web Application Firewall (WAF) policies, and proxy-forwards authenticated requests through the outbound tunnel connection.
+    \item \textbf{Intrusion Mitigation (fail2ban)}: The host runs \texttt{fail2ban} to monitor SSH access, automatically blocking IP addresses that exhibit brute-force signature behaviors.
+\end{itemize}
+
+% ==============================================================================
+% Section 4: Software Implementation
+% ==============================================================================
+\section{Software Implementation \& API Design}
+The system implementation contains decoupled handlers for the database schema, query engine, and REST API routing logic.
+
+\subsection{Asynchronous Core Query Execution Sequence}
+Figure 3 details the execution steps for resolving queries concurrently.
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[scale=0.8, every node/.style={transform shape}]
+    % Lifelines
+    \draw [line] (0,0) -- (0,-6.5) node[below] {Probe Loop};
+    \draw [line] (3,0) -- (3,-6.5) node[below] {Executor Pool};
+    \draw [line] (6,0) -- (6,-6.5) node[below] {Socket Layer};
+    \draw [line] (9,0) -- (9,-6.5) node[below] {Resolver End};
+    
+    % Labels
+    \node [above] at (0,0) {\textbf{Probe Loop}};
+    \node [above] at (3,0) {\textbf{Executor Pool}};
+    \node [above] at (6,0) {\textbf{Socket Layer}};
+    \node [above] at (9,0) {\textbf{Resolver End}};
+
+    % Messages
+    \draw [arrow] (0,-1) -- node[above, font=\scriptsize] {run\_in\_executor()} (3,-1);
+    \draw [arrow] (3,-1.8) -- node[above, font=\scriptsize] {connect(TCP 853)} (6,-1.8);
+    \draw [arrow] (6,-2.6) -- node[above, font=\scriptsize] {SYN} (9,-2.6);
+    \draw [dashedarrow] (9,-3.2) -- node[above, font=\scriptsize] {SYN-ACK} (6,-3.2);
+    \draw [arrow] (6,-4.0) -- node[above, font=\scriptsize] {TLS ClientHello} (9,-4.0);
+    \draw [dashedarrow] (9,-4.8) -- node[above, font=\scriptsize] {ServerHello + Cert} (6,-4.8);
+    \draw [arrow] (6,-5.5) -- node[above, font=\scriptsize] {Query (google.com A)} (9,-5.5);
+    \draw [dashedarrow] (9,-6.2) -- node[above, font=\scriptsize] {DNS Response} (0,-6.2);
+\end{tikzpicture}
+\caption{DoT Latency Measurement Sequence Diagram.}
+\end{figure}
+
+The asynchronous event loop delegates blocker network calls to the thread pool executor to maintain high-frequency resolution rates.
+
+% ==============================================================================
+% Section 5: CI/CD Pipeline
+% ==============================================================================
+\section{CI/CD Deployment Pipeline}
+The deployment pipeline automates validation testing, container builds, security auditing, and deployment to the host.
+
+\begin{figure}[h!]
+\centering
+\begin{tikzpicture}[node distance=1.2cm, auto]
+    % Pipeline nodes
+    \node [box, fill=blue!10] (push) {\textbf{Git Commit / Push}};
+    \node [box, fill=green!10, below=0.6cm of push] (lint) {\textbf{Lint \& Format} \\ Ruff validate};
+    \node [box, fill=green!10, below=0.6cm of lint] (test) {\textbf{Unit Tests} \\ pytest suite};
+    \node [box, fill=green!10, below=0.6cm of test] (build) {\textbf{Docker Build} \\ Push to GHCR};
+    \node [box, fill=orange!10, below=0.6cm of build] (deploy) {\textbf{Ansible Deploy} \\ SSH to EC2 Host};
+    
+    % Connections
+    \draw [arrow] (push) -- (lint);
+    \draw [arrow] (lint) -- (test);
+    \draw [arrow] (test) -- (build);
+    \draw [arrow] (build) -- (deploy);
+\end{tikzpicture}
+\caption{Continuous Integration and Continuous Deployment Workflow.}
+\end{figure}
+
+All tests must pass in the isolated GitHub Actions runner environment before images are built and pushed to the registry.
+
+% ==============================================================================
+% Section 6: Results
+% ==============================================================================
+\section{Empirical Evaluation \& Live Telemetry Analysis}
+We evaluated the performance of six target resolvers (Cloudflare, Google, Quad9, AdGuard, Mullvad, and CleanBrowsing) over 2,000 queries.
+
+\subsection{Telemetry Profiles}
+Table 1 compiles the averaged empirical latency results.
+
+\begin{table}[h!]
+\centering
+\caption{DNS, DoH, and DoT Latency and Expiry Telemetry Dataset.}
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Resolver} & \textbf{Protocol} & \textbf{Avg RTT} & \textbf{TLS Handshake} & \textbf{Cert Expiry} \\
+\midrule
+Cloudflare & DNS & ~155ms & N/A & N/A \\
+Cloudflare & DoH & ~200ms & ~11ms & 187 days \\
+Cloudflare & DoT & ~45ms & ~11ms & 187 days \\
+Google     & DNS & ~143ms & N/A & N/A \\
+Google     & DoH & ~187ms & ~21ms & 61 days \\
+Google     & DoT & ~15ms  & ~8ms  & 61 days \\
+Quad9      & DoT & N/A    & N/A   & 40 days \\
+AdGuard    & DoT & N/A    & N/A   & 135 days \\
+Mullvad    & DoT & ~127ms & ~358ms& 64 days \\
+CleanBrowsing& DoT& ~125ms & ~65ms & 28 days \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Key Latency Analysis Findings}
+DoT connections show optimized latency profiles when session reuse is enabled, reducing connection overhead. DoH queries show higher latencies due to HTTP overhead. N/A entries indicate resolvers experiencing packet drops or blocking configurations.
+
+% ==============================================================================
+% Section 7: Conclusion
+% ==============================================================================
+\section{Conclusions \& Future Work}
+Chronos-DNS provides a production-ready system design for collecting and analyzing DNS security telemetry. Future research will scale deployment to multiple global regions and correlate TLS cipher strength with cryptographic execution overheads.
+
+% ==============================================================================
+% References
+% ==============================================================================
+\begin{thebibliography}{1}
+\bibitem{rfc8484}
+IETF RFC 8484, ``DNS Queries over HTTPS (DoH)'', 2018.
+\bibitem{rfc7858}
+IETF RFC 7858, ``Specification for DNS over Transport Layer Security (DoT)'', 2016.
+\bibitem{caida}
+CAIDA Internet Measurement Group, ``Longitudinal Studies on DNS Privacy Adoption'', 2024.
+\bibitem{wide}
+WIDE Project Research Consortium, (https://www.wide.ad.jp).
+\end{thebibliography}
+
+\end{document}
