@@ -60,4 +60,5 @@ HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   || exit 1
 
 # Execute the probe application
-CMD ["uvicorn", "probe:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn probe:app --host 0.0.0.0 --port ${PORT:-8000}"]
+
