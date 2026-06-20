@@ -352,6 +352,27 @@ async def measurement_loop() -> None:
         
         await asyncio.sleep(30)
 
+@app.get("/")
+def root() -> Dict[str, Any]:
+    """
+    Root endpoint providing probe status overview.
+
+    Returns:
+        Dict[str, Any]: Probe identity and available endpoints.
+    """
+    return {
+        "service": "Chronos-DNS Probe",
+        "version": "1.0.0",
+        "status": "running",
+        "description": "Distributed DNS/DoH/DoT measurement probe",
+        "endpoints": {
+            "health": "/health",
+            "metrics": "/metrics (Prometheus)",
+            "ingest": "/ingest (POST)",
+            "docs": "/docs (Swagger UI)"
+        }
+    }
+
 @app.get("/health")
 def health_check() -> Dict[str, str]:
     """
@@ -361,6 +382,7 @@ def health_check() -> Dict[str, str]:
         Dict[str, str]: Service status dict.
     """
     return {"status": "healthy"}
+
 
 @app.post("/ingest")
 def ingest_telemetry(measurement: Dict[str, Any], db: Session = Depends(get_db)) -> Dict[str, str]:
