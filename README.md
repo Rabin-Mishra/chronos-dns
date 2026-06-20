@@ -16,6 +16,8 @@ research proposal submitted to the Embassy of Japan in Nepal
 Relationship to Cloud Infrastructure Reliability in Real-World Internet
 Environments"**
 
+📄 **Research Paper (Zenodo):** [zenodo.org/records/20729609](https://zenodo.org/records/20729609)
+
 ### Target Institution
 This project is designed to demonstrate research readiness for the
 **WIDE Project** (Widely Integrated Distributed Environment) — the
@@ -100,7 +102,7 @@ The following metrics are actively collected by the `chronos-dns-probe` service 
 
 ### Grafana Dashboard Visualizations
 
-Here is the live Grafana dashboard showing the global DNS resolver query metrics, including Average RTT, Success Rate, TLS Certificate Expiry, and TLS Handshake Latency:
+Here is the live, interactive **[Grafana Public Dashboard](https://vividcanoe17.grafana.net/public-dashboards/99f58789d9c845b9a5844e01ff150b2e)** showing the global DNS resolver query metrics, including Average RTT, Success Rate, TLS Certificate Expiry, TLS Handshake Latency, and Failure/Error Diagnostics:
 
 ![Grafana Dashboard](./assets/grafana_dashboard.png)
 
