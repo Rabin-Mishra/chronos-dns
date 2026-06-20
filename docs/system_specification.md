@@ -79,13 +79,13 @@ The sequence diagram below represents the exact operations executed by the async
 
 ```mermaid
 sequenceDiagram
-    participant Loop as Event Loop (asyncio)
+    participant EvLoop as Event Loop (asyncio)
     participant Thread as ThreadPool Executor
     participant Sock as Network Socket
     participant Resolver as Target Resolver
     participant DB as Neon PostgreSQL
 
-    Loop->>Thread: run_in_executor(do_dot_query)
+    EvLoop->>Thread: run_in_executor(do_dot_query)
     Thread->>Sock: socket.create_connection(TCP 853)
     Sock->>Resolver: TCP SYN
     Resolver-->>Sock: TCP SYN-ACK
@@ -99,8 +99,8 @@ sequenceDiagram
     Sock->>Resolver: query (google.com A)
     Resolver-->>Sock: response payload
     Note over Thread,Resolver: Response Received (T_query recorded)
-    Thread-->>Loop: Return telemetry packet
-    Loop->>DB: Ingest telemetry (SQLAlchemy commit)
+    Thread-->>EvLoop: Return telemetry packet
+    EvLoop->>DB: Ingest telemetry (SQLAlchemy commit)
 ```
 
 ---
