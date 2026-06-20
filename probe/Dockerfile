@@ -37,8 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root system group and user
-RUN groupadd -g 10001 chronos && \
-    useradd -u 10001 -g chronos -m -s /bin/bash chronos
+RUN groupadd -g 1000 chronos && \
+    useradd -u 1000 -g chronos -m -s /bin/bash chronos
 
 # Copy installed Python packages from the builder stage
 COPY --from=builder --chown=chronos:chronos /root/.local /home/chronos/.local
