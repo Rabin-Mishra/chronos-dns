@@ -1,0 +1,15 @@
+---
+title: Chronos DNS
+emoji: 🌐
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+# Chronos DNS Probe Node
+
+An automated, cloud-native distributed measurement fabric for empirical analysis of DNS-over-HTTPS (DoH) and DNS-over-TLS (DoT) deployment, latency, and cryptographic compliance across global internet environments.
+
+This node is running as a Docker Space on Hugging Face.
